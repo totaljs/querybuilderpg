@@ -1,0 +1,28 @@
+{
+  "name": "querybuilderpg",
+  "version": "1.0.0",
+  "description": "PostgreSQL integrator",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/totaljs/querybuilderpg.git"
+  },
+  "dependencies": {
+    "total4": "latest",
+    "pg": "latest"
+  },
+  "keywords": [
+    "orm",
+    "postgresql",
+    "pg"
+  ],
+  "author": "Peter Sirka",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/totaljs/querybuilderpg/issues"
+  },
+  "homepage": "https://github.com/totaljs/querybuilderpg#readme"
+}
