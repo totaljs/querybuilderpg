@@ -94,6 +94,10 @@ function pg_where(where, filter, operator) {
 				where.length && where.push(operator);
 				where.push(item.name + ' IN (' + PG_ESCAPE(item.value) + ')');
 				break;
+			case 'query':
+				where.length && where.push(operator);
+				where.push('(' + item.value + ')');
+				break;
 			case 'notin':
 				where.length && where.push(operator);
 				where.push(item.name + ' NOT IN (' + PG_ESCAPE(item.value) + ')');
