@@ -6,7 +6,7 @@ const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
 const LOGGER = '-- PostgreSQL -->';
 
-function exec(client, filter, callback, done) {
+function exec(client, filter, callback, done, errorhandling) {
 
 	var cmd;
 
@@ -19,6 +19,7 @@ function exec(client, filter, callback, done) {
 		client.query(cmd.query, cmd.params, function(err, response) {
 			if (err) {
 				done();
+				errorhandling && errorhandling(err, cmd);
 				callback(err);
 			} else {
 				cmd = makesql(filter, 'count');
@@ -27,6 +28,7 @@ function exec(client, filter, callback, done) {
 					console.log(LOGGER, cmd.query, cmd.params);
 
 				client.query(cmd.query, cmd.params, function(err, counter) {
+					err && errorhandling && errorhandling(err, cmd);
 					done();
 					callback(err, err ? null : { items: response.rows, count: +counter.rows[0].count });
 				});
@@ -39,12 +41,13 @@ function exec(client, filter, callback, done) {
 		// update
 
 		if (filter.debug)
-			console.log(Logger, cmd.query, cmd.params);
+			console.log(LOGGER, cmd.query, cmd.params);
 
 		client.query(cmd.query, cmd.params, function(err, response) {
 
 			if (err) {
 				done();
+				errorhandling && errorhandling(err, cmd);
 				callback(err);
 				return;
 			}
@@ -63,6 +66,7 @@ function exec(client, filter, callback, done) {
 				console.log(LOGGER, cmd.query, cmd.params);
 
 			client.query(cmd.query, cmd.params, function(err, response) {
+				err && errorhandling && errorhandling(err, cmd);
 				callback(err, err ? 0 : (response.rows && response.rows.length ? filter.primarykey ? response.rows[0][filter.primarykey] : 1 : 1));
 			});
 
@@ -80,6 +84,7 @@ function exec(client, filter, callback, done) {
 		done();
 
 		if (err) {
+			errorhandling && errorhandling(err, cmd);
 			callback(err);
 			return;
 		}
@@ -387,7 +392,7 @@ function dateToString(dt) {
 Pg.types.setTypeParser(1700, val => val == null ? null : +val);
 global.PG_ESCAPE = PG_ESCAPE;
 
-exports.init = function(name, connstring, pooling) {
+exports.init = function(name, connstring, pooling, errorhandling) {
 
 	if (!name)
 		name = 'default';
@@ -408,12 +413,12 @@ exports.init = function(name, connstring, pooling) {
 				if (err)
 					callback(err);
 				else
-					exec(client, filter, callback, done);
+					exec(client, filter, callback, done, errorhandling);
 			});
 		} else {
 			var client = new Pg.Client({ connectionString: connstring });
 			client.connect();
-			exec(client, filter, callback, () => client.end());
+			exec(client, filter, callback, () => client.end(), errorhandling);
 		}
 	});
 };
