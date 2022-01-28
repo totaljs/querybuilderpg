@@ -113,14 +113,24 @@ function pg_where(where, filter, operator) {
 	for (var item of filter) {
 		switch (item.type) {
 			case 'or':
-				var tmp = [];
+				tmp = [];
 				pg_where(tmp, item.value, 'OR');
 				where.length && where.push(operator);
 				where.push('(' + tmp.join(' ') + ')');
 				break;
 			case 'in':
 				where.length && where.push(operator);
-				where.push(item.name + ' IN (' + PG_ESCAPE(item.value) + ')');
+				tmp = [];
+				if (item.value instanceof Array) {
+					for (var val of item.value) {
+						if (val != null)
+							tmp.push(PG_ESCAPE(val));
+					}
+				} else if (item.value != null)
+					tmp = [PG_ESCAPE(item.value)];
+				if (!tmp.length)
+					tmp.push('null');
+				where.push(item.name + ' IN (' + tmp.join(',') + ')');
 				break;
 			case 'query':
 				where.length && where.push(operator);
