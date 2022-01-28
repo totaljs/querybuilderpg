@@ -185,7 +185,7 @@ function pg_insertupdate(filter, insert) {
 				key = key.substring(1);
 				params.push(val ? val : 0);
 				if (insert) {
-					fields.push(key);
+					fields.push('"' + key + '"');
 					query.push('$' + params.length);
 				} else
 					query.push('"' + key + '"=COALESCE(' + key + ',0)' + c + '$' + params.length);
@@ -195,7 +195,7 @@ function pg_insertupdate(filter, insert) {
 				key = key.substring(1);
 				params.push(val ? val : 0);
 				if (insert) {
-					fields.push(key);
+					fields.push('"' + key + '"');
 					query.push('$' + params.length);
 				} else
 					query.push('"' + key + '"=' + (c === '>' ? 'GREATEST' : 'LEAST') + '(' + key + ',$' + params.length + ')');
@@ -204,7 +204,7 @@ function pg_insertupdate(filter, insert) {
 				// toggle
 				key = key.substring(1);
 				if (insert) {
-					fields.push(key);
+					fields.push('"' + key + '"');
 					query.push('FALSE');
 				} else
 					query.push('"' + key + '"=NOT ' + key);
@@ -215,7 +215,7 @@ function pg_insertupdate(filter, insert) {
 				key = key.substring(1);
 				if (insert) {
 					if (c === '=') {
-						fields.push(key);
+						fields.push('"' + key + '"');
 						query.push(val);
 					}
 				} else
@@ -224,7 +224,7 @@ function pg_insertupdate(filter, insert) {
 			default:
 				params.push(val);
 				if (insert) {
-					fields.push(key);
+					fields.push('"' + key + '"');
 					query.push('$' + params.length);
 				} else
 					query.push('"' + key + '"=$' + params.length);
