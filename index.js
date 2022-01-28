@@ -4,6 +4,7 @@ const Pg = require('pg');
 const POOLS = {};
 const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
+const LOGGER = '-- PostgreSQL -->';
 
 function exec(client, filter, callback, done) {
 
@@ -11,12 +12,20 @@ function exec(client, filter, callback, done) {
 
 	if (filter.exec === 'list') {
 		cmd = makesql(filter);
+
+		if (filter.debug)
+			console.log(LOGGER, cmd.query, cmd.params);
+
 		client.query(cmd.query, cmd.params, function(err, response) {
 			if (err) {
 				done();
 				callback(err);
 			} else {
 				cmd = makesql(filter, 'count');
+
+				if (filter.debug)
+					console.log(LOGGER, cmd.query, cmd.params);
+
 				client.query(cmd.query, cmd.params, function(err, counter) {
 					done();
 					callback(err, err ? null : { items: response.rows, count: +counter.rows[0].count });
@@ -28,6 +37,10 @@ function exec(client, filter, callback, done) {
 
 	if (filter.upsert) {
 		// update
+
+		if (filter.debug)
+			console.log(Logger, cmd.query, cmd.params);
+
 		client.query(cmd.query, cmd.params, function(err, response) {
 
 			if (err) {
@@ -45,7 +58,11 @@ function exec(client, filter, callback, done) {
 
 			cmd = makesql(filter, 'insert');
 			// insert
-			client.query(cmd, cmd.params, function(err, response) {
+
+			if (filter.debug)
+				console.log(LOGGER, cmd.query, cmd.params);
+
+			client.query(cmd.query, cmd.params, function(err, response) {
 				callback(err, err ? 0 : (response.rows && response.rows.length ? filter.primarykey ? response.rows[0][filter.primarykey] : 1 : 1));
 			});
 
@@ -54,12 +71,16 @@ function exec(client, filter, callback, done) {
 	}
 
 	cmd = makesql(filter);
+
+	if (filter.debug)
+		console.log(LOGGER, cmd.query, cmd.params);
+
 	client.query(cmd.query, cmd.params, function(err, response) {
 
 		done();
 
 		if (err) {
-			callback(null);
+			callback(err);
 			return;
 		}
 
@@ -199,7 +220,7 @@ function pg_insertupdate(filter, insert) {
 					fields.push(key);
 					query.push('$' + params.length);
 				} else
-					query.push('"' + key.substring(1) + '"=$' + params.length);
+					query.push('"' + key + '"=$' + params.length);
 				break;
 		}
 	}
@@ -242,7 +263,7 @@ function makesql(opt, exec) {
 			query = 'DELETE FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			break;
 		case 'update':
-			tmp = pg_insertupdate(opt, true);
+			tmp = pg_insertupdate(opt);
 			query = 'WITH rows AS (UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
 			params = tmp.params;
 			break;
