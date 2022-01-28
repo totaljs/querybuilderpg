@@ -38,7 +38,9 @@ function exec(client, filter, callback, done, errorhandling) {
 	}
 
 	if (filter.upsert) {
+
 		// update
+		cmd = makesql(filter);
 
 		if (filter.debug)
 			console.log(LOGGER, cmd.query, cmd.params);
