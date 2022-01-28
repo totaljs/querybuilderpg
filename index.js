@@ -86,11 +86,13 @@ function exec(client, filter, callback, done) {
 
 		switch (filter.exec) {
 			case 'insert':
-				callback(null, response.rows[0][filter.primarykey] || 1);
+				callback(null, filter.primarykey ? response.rows.length && response.rows[0][filter.primarykey] : response.rowCount);
 				break;
 			case 'update':
-			case 'remove':
 				callback(null, response.rows[0].count || 0);
+				break;
+			case 'remove':
+				callback(null, response.rowCount);
 				break;
 			default:
 				callback(err, response.rows);
