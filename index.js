@@ -419,9 +419,8 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 
 	NEWDB(name, function(filter, callback) {
 		if (pooling) {
-			if (!POOLS[name])
-				POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling });
-			POOLS[name].connect(function(err, client, done) {
+			var pool = POOLS[name] || (POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling }));
+			pool.connect(function(err, client, done) {
 				if (err)
 					callback(err);
 				else
@@ -429,8 +428,12 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 			});
 		} else {
 			var client = new Pg.Client({ connectionString: connstring });
-			client.connect();
-			exec(client, filter, callback, () => client.end(), errorhandling);
+			client.connect(function(err, client) {
+				if (err)
+					callback(err);
+				else
+					exec(client, filter, callback, () => client.end(), errorhandling);
+			});
 		}
 	});
 };
