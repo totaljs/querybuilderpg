@@ -357,7 +357,7 @@ function PG_ESCAPE(value) {
 		return value === true ? 'true' : 'false';
 
 	if (type === 'number')
-		return value.toString();
+		return value + '';
 
 	if (type === 'string')
 		return pg_escape(value);
