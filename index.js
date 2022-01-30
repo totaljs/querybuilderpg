@@ -313,7 +313,7 @@ function makesql(opt, exec) {
 			}
 			break;
 		case 'query':
-			query = opt.table;
+			query = opt.query + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			break;
 	}
 
