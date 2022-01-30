@@ -28,8 +28,8 @@ function exec(client, filter, callback, done, errorhandling) {
 					console.log(LOGGER, cmd.query, cmd.params);
 
 				client.query(cmd.query, cmd.params, function(err, counter) {
-					err && errorhandling && errorhandling(err, cmd);
 					done();
+					err && errorhandling && errorhandling(err, cmd);
 					callback(err, err ? null : { items: response.rows, count: +counter.rows[0].count });
 				});
 			}
@@ -57,6 +57,7 @@ function exec(client, filter, callback, done, errorhandling) {
 			response = response.rows[0];
 
 			if (response && response.count) {
+				done();
 				callback(null, response.count);
 				return;
 			}
@@ -68,6 +69,7 @@ function exec(client, filter, callback, done, errorhandling) {
 				console.log(LOGGER, cmd.query, cmd.params);
 
 			client.query(cmd.query, cmd.params, function(err, response) {
+				done();
 				err && errorhandling && errorhandling(err, cmd);
 				callback(err, err ? 0 : (response.rows && response.rows.length ? filter.primarykey ? response.rows[0][filter.primarykey] : 1 : 1));
 			});
