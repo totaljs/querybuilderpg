@@ -37,47 +37,6 @@ function exec(client, filter, callback, done, errorhandling) {
 		return;
 	}
 
-	if (filter.upsert) {
-
-		// update
-		cmd = makesql(filter);
-
-		if (filter.debug)
-			console.log(LOGGER, cmd.query, cmd.params);
-
-		client.query(cmd.query, cmd.params, function(err, response) {
-
-			if (err) {
-				done();
-				errorhandling && errorhandling(err, cmd);
-				callback(err);
-				return;
-			}
-
-			response = response.rows[0];
-
-			if (response && response.count) {
-				done();
-				callback(null, response.count);
-				return;
-			}
-
-			cmd = makesql(filter, 'insert');
-			// insert
-
-			if (filter.debug)
-				console.log(LOGGER, cmd.query, cmd.params);
-
-			client.query(cmd.query, cmd.params, function(err, response) {
-				done();
-				err && errorhandling && errorhandling(err, cmd);
-				callback(err, err ? 0 : (response.rows && response.rows.length ? filter.primarykey ? response.rows[0][filter.primarykey] : 1 : 1));
-			});
-
-		});
-		return;
-	}
-
 	cmd = makesql(filter);
 
 	if (filter.debug)
