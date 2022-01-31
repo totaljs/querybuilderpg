@@ -280,9 +280,10 @@ function makesql(opt, exec) {
 
 		if (opt.sort) {
 			query += ' ORDER BY';
-			for (var item of opt.sort) {
+			for (var i = 0; i < opt.sort.length; i++) {
+				var item = opt.sort[i];
 				index = item.lastIndexOf('_');
-				query += ' ' + item.substring(0, index) + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
+				query += (i ? ', ' : ' ') + item.substring(0, index) + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
 			}
 		}
 
