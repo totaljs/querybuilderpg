@@ -371,6 +371,9 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 	if (!name)
 		name = 'default';
 
+	if (pooling)
+		pooling = +pooling;
+
 	if (!connstring) {
 		if (POOLS[name]) {
 			POOLS[name].end();
