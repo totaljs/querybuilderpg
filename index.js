@@ -82,6 +82,7 @@ function pg_where(where, filter, operator) {
 				where.push('(' + tmp.join(' ') + ')');
 				break;
 			case 'in':
+			case 'notin':
 				where.length && where.push(operator);
 				tmp = [];
 				if (item.value instanceof Array) {
@@ -93,15 +94,11 @@ function pg_where(where, filter, operator) {
 					tmp = [PG_ESCAPE(item.value)];
 				if (!tmp.length)
 					tmp.push('null');
-				where.push(item.name + ' IN (' + tmp.join(',') + ')');
+				where.push(item.name + (item.type === 'in' ? ' IN ' : ' NOT IN ') + '(' + tmp.join(',') + ')');
 				break;
 			case 'query':
 				where.length && where.push(operator);
 				where.push('(' + item.value + ')');
-				break;
-			case 'notin':
-				where.length && where.push(operator);
-				where.push(item.name + ' NOT IN (' + PG_ESCAPE(item.value) + ')');
 				break;
 			case 'where':
 				where.length && where.push(operator);
