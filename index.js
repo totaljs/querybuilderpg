@@ -1,10 +1,11 @@
 // Total.js Module: PostgreSQL integrator
 
+const CANSTATS = global.F ? (global.F.stats && global.F.stats.performance && global.F.stats.performance.dbrm != null) : false;
 const Pg = require('pg');
-const POOLS = {};
 const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
 const LOGGER = '-- PostgreSQL -->';
+const POOLS = {};
 
 function exec(client, filter, callback, done, errorhandling) {
 
@@ -210,6 +211,7 @@ function makesql(opt, exec) {
 	var query = '';
 	var where = [];
 	var model = {};
+	var isread = false;
 	var params;
 	var index;
 	var tmp;
@@ -223,13 +225,16 @@ function makesql(opt, exec) {
 		case 'find':
 		case 'read':
 			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			isread = true;
 			break;
 		case 'list':
 			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			isread = true;
 			break;
 		case 'count':
 			opt.first = true;
 			query = 'SELECT COUNT(1)::int as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			isread = true;
 			break;
 		case 'insert':
 			tmp = pg_insertupdate(opt, true);
@@ -267,9 +272,11 @@ function makesql(opt, exec) {
 					query = 'SELECT ' + opt.scalar.key + ', ' + (opt.scalar.key2 ? ('SUM(' + opt.scalar.key2 + ')::numeric') : 'COUNT(1)::int') + ' as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
 					break;
 			}
+			isread = true;
 			break;
 		case 'query':
 			query = opt.query + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			isread = true;
 			break;
 	}
 
@@ -294,6 +301,13 @@ function makesql(opt, exec) {
 
 	model.query = query;
 	model.params = params;
+
+	if (CANSTATS) {
+		if (isread)
+			F.stats.performance.dbrm++;
+		else
+			F.stats.performance.dbwm++;
+	}
 
 	return model;
 }
