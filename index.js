@@ -390,6 +390,9 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 			POOLS[name].end();
 			delete POOLS[name];
 		}
+
+		// Removes instance
+		NEWDB(name, null);
 		return;
 	}
 
