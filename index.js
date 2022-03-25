@@ -58,10 +58,13 @@ function exec(client, filter, callback, done, errorhandling) {
 				callback(null, filter.primarykey ? response.rows.length && response.rows[0][filter.primarykey] : response.rowCount);
 				break;
 			case 'update':
-				callback(null, response.rows[0].count || 0);
+				callback(null, response.rows[0] ? (response.rows[0].count || 0) : 0);
 				break;
 			case 'remove':
 				callback(null, response.rowCount);
+				break;
+			case 'check':
+				callback(null, response.rows[0] ? response.rows[0].count > 0 : false);
 				break;
 			default:
 				callback(err, response.rows);
@@ -249,6 +252,10 @@ function makesql(opt, exec) {
 			query = 'WITH rows AS (UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
 			params = tmp.params;
 			break;
+		case 'check':
+			query = 'SELECT 1 as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			isread = true;
+			break;
 		case 'drop':
 			query = 'DROP TABLE ' + opt.table;
 			break;
@@ -280,7 +287,7 @@ function makesql(opt, exec) {
 			break;
 	}
 
-	if (exec === 'find' || exec === 'read' || exec === 'list' || exec === 'query') {
+	if (exec === 'find' || exec === 'read' || exec === 'list' || exec === 'query' || exec === 'check') {
 
 		if (opt.sort) {
 			query += ' ORDER BY';
