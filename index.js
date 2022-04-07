@@ -273,10 +273,10 @@ function makesql(opt, exec) {
 				case 'count':
 					opt.first = true;
 					var val = opt.scalar.key === '*' ? 1 : opt.scalar.key;
-					query = 'SELECT ' + opt.scalar.type.toUpperCase() + (opt.scalar.type !== 'count' ? ('(' + val + ')') : '(1)') + '::int as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+					query = 'SELECT ' + opt.scalar.type.toUpperCase() + (opt.scalar.type !== 'count' ? ('(' + val + ')') : '(1)') + '::numeric as "' + opt.scalar.type + '" FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
 					break;
 				case 'group':
-					query = 'SELECT ' + opt.scalar.key + ', ' + (opt.scalar.key2 ? ('SUM(' + opt.scalar.key2 + ')::numeric') : 'COUNT(1)::int') + ' as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+					query = 'SELECT ' + opt.scalar.key + ', ' + (opt.scalar.key2 ? ('SUM(' + opt.scalar.key2 + ')::numeric') : 'COUNT(1)::int') + ' as "' + opt.scalar.type + '" FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
 					break;
 			}
 			isread = true;
