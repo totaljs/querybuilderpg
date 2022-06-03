@@ -4,6 +4,7 @@ const CANSTATS = global.F ? (global.F.stats && global.F.stats.performance && glo
 const Pg = require('pg');
 const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
+const REG_LANGUAGE = /[a-z0-9]+§/gi;
 const LOGGER = '-- PostgreSQL -->';
 const POOLS = {};
 
@@ -73,15 +74,19 @@ function exec(client, filter, callback, done, errorhandling) {
 	});
 }
 
-function pg_where(where, filter, operator) {
+function pg_where(where, opt, filter, operator) {
 
 	var tmp;
 
 	for (var item of filter) {
+
+		if (opt.language != null && item.name && item.name[item.name.length - 1] === '§')
+			item.name = item.name.substring(0, item.name.length - 1) + opt.language;
+
 		switch (item.type) {
 			case 'or':
 				tmp = [];
-				pg_where(tmp, item.value, 'OR');
+				pg_where(tmp, opt, item.value, 'OR');
 				where.length && where.push(operator);
 				where.push('(' + tmp.join(' ') + ')');
 				break;
@@ -225,7 +230,14 @@ function makesql(opt, exec) {
 	if (!exec)
 		exec = opt.exec;
 
-	pg_where(where, opt.filter, 'AND');
+	pg_where(where, opt, opt.filter, 'AND');
+
+	if (opt.language != null && opt.fields) {
+		opt.fields = opt.fields.replace(REG_LANGUAGE, function(val) {
+			val = val.substring(0, val.length - 1);
+			return val + (opt.language ? (opt.language + ' as ' + val) : '');
+		});
+	}
 
 	switch (exec) {
 		case 'find':
@@ -293,12 +305,19 @@ function makesql(opt, exec) {
 	if (exec === 'find' || exec === 'read' || exec === 'list' || exec === 'query' || exec === 'check') {
 
 		if (opt.sort) {
-			query += ' ORDER BY';
+
+			tmp = '';
+
 			for (var i = 0; i < opt.sort.length; i++) {
 				var item = opt.sort[i];
 				index = item.lastIndexOf('_');
-				query += (i ? ', ' : ' ') + item.substring(0, index) + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
+				tmp += (i ? ', ' : ' ') + item.substring(0, index) + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
 			}
+
+			if (opt.language != null)
+				tmp = tmp.replace(REG_LANGUAGE, val => (val.substring(0, val.length - 1) + opt.language));
+
+			query += ' ORDER BY' + tmp;
 		}
 
 		if (opt.take && opt.skip)
