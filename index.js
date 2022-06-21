@@ -217,6 +217,13 @@ function pg_insertupdate(filter, insert) {
 	return { fields, query, params };
 }
 
+function replacelanguage(fields, language, noas) {
+	return fields.replace(REG_LANGUAGE, function(val) {
+		val = val.substring(0, val.length - 1);
+		return val + (noas ? language : (language ? (language + ' as ' + val) : ''));
+	});
+}
+
 function makesql(opt, exec) {
 
 	var query = '';
@@ -232,12 +239,8 @@ function makesql(opt, exec) {
 
 	pg_where(where, opt, opt.filter, 'AND');
 
-	if (opt.language != null && opt.fields) {
-		opt.fields = opt.fields.replace(REG_LANGUAGE, function(val) {
-			val = val.substring(0, val.length - 1);
-			return val + (opt.language ? (opt.language + ' as ' + val) : '');
-		});
-	}
+	if (opt.language != null && opt.fields)
+		opt.fields = replacelanguage(opt.fields.join(','), opt.language);
 
 	switch (exec) {
 		case 'find':
@@ -315,7 +318,7 @@ function makesql(opt, exec) {
 			}
 
 			if (opt.language != null)
-				tmp = tmp.replace(REG_LANGUAGE, val => (val.substring(0, val.length - 1) + opt.language));
+				tmp = replacelanguage(tmp, opt.language, true);
 
 			query += ' ORDER BY' + tmp;
 		}
