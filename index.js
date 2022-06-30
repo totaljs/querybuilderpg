@@ -67,6 +67,15 @@ function exec(client, filter, callback, done, errorhandling) {
 			case 'check':
 				callback(null, response.rows[0] ? response.rows[0].count > 0 : false);
 				break;
+			case 'count':
+				callback(null, response.rows[0] ? response.rows[0].count : null);
+				break;
+			case 'scalar':
+				if (filter.scalar.type === 'group')
+					callback(null, response.rows);
+				else
+					callback(null, response.rows[0] ? response.rows[0].value : null);
+				break;
 			default:
 				callback(err, response.rows);
 				break;
