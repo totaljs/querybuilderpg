@@ -167,6 +167,10 @@ function pg_insertupdate(filter, insert) {
 
 	for (var key in filter.payload) {
 		var val = filter.payload[key];
+
+		if (val === undefined)
+			continue;
+
 		var c = key[0];
 		switch (c) {
 			case '-':
