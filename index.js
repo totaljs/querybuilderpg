@@ -5,6 +5,7 @@ const Pg = require('pg');
 const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
 const REG_LANGUAGE = /[a-z0-9]+§/gi;
+const REG_WRITE = /(INSERT|UPDATE|DELETE|DROP)\s/i;
 const LOGGER = '-- PostgreSQL -->';
 const POOLS = {};
 
@@ -314,7 +315,8 @@ function makesql(opt, exec) {
 			break;
 		case 'query':
 			query = opt.query + (where.length ? (' WHERE ' + where.join(' ')) : '');
-			isread = true;
+			params = opt.params;
+			isread = REG_WRITE.test(query) ? false : true;
 			break;
 	}
 
