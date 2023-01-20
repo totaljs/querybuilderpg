@@ -55,30 +55,51 @@ function exec(client, filter, callback, done, errorhandling) {
 			return;
 		}
 
+		var output;
+
 		switch (filter.exec) {
 			case 'insert':
-				callback(null, filter.primarykey ? response.rows.length && response.rows[0][filter.primarykey] : response.rowCount);
+				if (filter.returning)
+					output = response.rows.length && response.rows[0];
+				else if (filter.primarykey)
+					output = response.rows.length && response.rows[0][filter.primarykey];
+				else
+					output = response.rowCount;
+				callback(null, output);
 				break;
 			case 'update':
-				callback(null, response.rows[0] ? (response.rows[0].count || 0) : 0);
+
+				if (filter.returning)
+					output = filter.first ? (response.rows.length && response.rows[0]) : response.rows;
+				else
+					output = (response.rows.length && response.rows[0].count) || 0;
+
+				callback(null, output);
 				break;
 			case 'remove':
-				callback(null, response.rowCount);
+
+				if (filter.returning)
+					output = filter.first ? (response.rows.length && response.rows[0]) : response.rows;
+				else
+					output = response.rowCount;
+
+				callback(null, output);
 				break;
 			case 'check':
-				callback(null, response.rows[0] ? response.rows[0].count > 0 : false);
+				output = response.rows[0] ? response.rows[0].count > 0 : false;
+				callback(null, output);
 				break;
 			case 'count':
-				callback(null, response.rows[0] ? response.rows[0].count : null);
+				output = response.rows[0] ? response.rows[0].count : null;
+				callback(null, output);
 				break;
 			case 'scalar':
-				if (filter.scalar.type === 'group')
-					callback(null, response.rows);
-				else
-					callback(null, response.rows[0] ? response.rows[0].value : null);
+				output = filter.scalar.type === 'group' ? response.rows : (response.rows[0] ? response.rows[0].value : null);
+				callback(null, output);
 				break;
 			default:
-				callback(err, response.rows);
+				output = response.rows;
+				callback(err, output);
 				break;
 		}
 	});
@@ -234,7 +255,7 @@ function pg_insertupdate(filter, insert) {
 function replacelanguage(fields, language, noas) {
 	return fields.replace(REG_LANGUAGE, function(val) {
 		val = val.substring(0, val.length - 1);
-		return val + (noas ? language : (language ? (language + ' as ' + val) : ''));
+		return val + (noas ? language : (language ? (language + ' AS ' + val) : ''));
 	});
 }
 
@@ -246,6 +267,7 @@ function makesql(opt, exec) {
 	var isread = false;
 	var params;
 	var index;
+	var returning;
 	var tmp;
 
 	if (!exec)
@@ -272,16 +294,22 @@ function makesql(opt, exec) {
 			isread = true;
 			break;
 		case 'insert':
+			returning = opt.returning ? opt.returning.join(',') : opt.primarykey ? opt.primarykey : '';
 			tmp = pg_insertupdate(opt, true);
-			query = 'INSERT INTO ' + opt.table + ' (' + tmp.fields.join(',') + ') VALUES(' + tmp.query.join(',') + ')' + (opt.primarykey ? ' RETURNING ' + opt.primarykey : '');
+			query = 'INSERT INTO ' + opt.table + ' (' + tmp.fields.join(',') + ') VALUES(' + tmp.query.join(',') + ')' + (returning ? ' RETURNING ' + returning : '');
 			params = tmp.params;
 			break;
 		case 'remove':
-			query = 'DELETE FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			returning = opt.returning ? opt.returning.join(',') : opt.primarykey ? opt.primarykey : '';
+			query = 'DELETE FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
 			break;
 		case 'update':
+			returning = opt.returning ? opt.returning.join(',') : '';
 			tmp = pg_insertupdate(opt);
-			query = 'WITH rows AS (UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
+			if (returning)
+				query = 'UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
+			else
+				query = 'WITH rows AS (UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
 			params = tmp.params;
 			break;
 		case 'check':
