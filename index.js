@@ -471,6 +471,11 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		return;
 	}
 
+	var onerror = null;
+
+	if (errorhandling)
+		onerror = (err, cmd) => errorhandling(err + ' - ' + cmd.query.substring(0, 60));
+
 	NEWDB(name, function(filter, callback) {
 		if (pooling) {
 			var pool = POOLS[name] || (POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling }));
@@ -478,7 +483,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 				if (err)
 					callback(err);
 				else
-					exec(client, filter, callback, done, errorhandling);
+					exec(client, filter, callback, done, onerror);
 			});
 		} else {
 			var client = new Pg.Client({ connectionString: connstring });
@@ -486,7 +491,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 				if (err)
 					callback(err);
 				else
-					exec(client, filter, callback, () => client.end(), errorhandling);
+					exec(client, filter, callback, () => client.end(), onerror);
 			});
 		}
 	});
