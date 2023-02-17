@@ -7,7 +7,7 @@ A simple QueryBuilder integrator for PostgreSQL database.
 
 ## Initialization
 
-- Connection string example: `postgresql://user:password@localhost:5432/database`
+- Example: `postgresql://user:password@localhost:5432/database`
 
 ```js
 // require('querybuilderpg').init(name, connectionstring, pooling, [errorhandling]);
