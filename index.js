@@ -486,7 +486,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 
 	NEWDB(name, function(filter, callback) {
 
-		if (!filter.schema && defschema)
+		if (filter.schema == null && defschema)
 			filter.schema = defschema;
 
 		if (filter.schema)
