@@ -31,5 +31,7 @@ DB().find('tbl_user').where('id', 1234).callback(console.log);
 
 - Connection string example: `postgresql://user:password@localhost:5432/database?schema=parking&pooling=2`
 
+---
+
 - `schema=String` sets a default DB schema
 - `pooling=Number` sets a default pooling (it overwrites pooling)
