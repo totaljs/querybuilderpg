@@ -5,7 +5,9 @@ A simple QueryBuilder integrator for PostgreSQL database.
 - [Documentation](https://docs.totaljs.com/total4/)
 - `$ npm install querybuilderpg`
 
-__Initialization__:
+## Initialization
+
+- Connection string example: `postgresql://user:password@localhost:5432/database`
 
 ```js
 // require('querybuilderpg').init(name, connectionstring, pooling, [errorhandling]);
@@ -24,3 +26,10 @@ __Usage__:
 DB().find('tbl_user').where('id', 1234).callback(console.log);
 // DB('default').find('tbl_user').where('id', 1234).callback(console.log);
 ```
+
+## Connection string attributes
+
+- Connection string example: `postgresql://user:password@localhost:5432/database?schema=parking&pooling=2`
+
+- `schema=String` sets a default DB schema
+- `pooling=Number` sets a default pooling (it overwrites pooling)

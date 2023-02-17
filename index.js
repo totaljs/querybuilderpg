@@ -482,6 +482,8 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 	if (index !== -1) {
 		var args = connstring.substring(index + 1).parseEncoded();
 		defschema = args.schema;
+		if (args.pooling)
+			pooling = +args.pooling;
 	}
 
 	NEWDB(name, function(filter, callback) {
