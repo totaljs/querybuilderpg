@@ -476,7 +476,22 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 	if (errorhandling)
 		onerror = (err, cmd) => errorhandling(err + ' - ' + cmd.query.substring(0, 60));
 
+	var index = connstring.indexOf('?');
+	var defschema = '';
+
+	if (index !== -1) {
+		var args = connstring.substring(index + 1).parseEncoded();
+		defschema = args.schema;
+	}
+
 	NEWDB(name, function(filter, callback) {
+
+		if (!filter.schema && defschema)
+			filter.schema = defschema;
+
+		if (filter.schema)
+			filter.table = filter.schema + '.' + filter.table;
+
 		if (pooling) {
 			var pool = POOLS[name] || (POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling }));
 			pool.connect(function(err, client, done) {
