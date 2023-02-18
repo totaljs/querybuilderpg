@@ -1,5 +1,4 @@
 // Total.js Module: PostgreSQL integrator
-
 const CANSTATS = global.F ? (global.F.stats && global.F.stats.performance && global.F.stats.performance.dbrm != null) : false;
 const Pg = require('pg');
 const REG_PG_ESCAPE_1 = /'/g;
@@ -513,3 +512,5 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		}
 	});
 };
+
+global.PG_VIEWS = require('./views');
