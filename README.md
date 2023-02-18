@@ -38,7 +38,7 @@ DB().find('tbl_user').where('id', 1234).callback(console.log);
 
 ## Views
 
-__BETA__ version. Views are used to create reports from the PG database according to dynamic filters. You can create a client-side interface for creating various reports from preddefined views.
+__BETA__ version. Views are used to create reports from the PG database according to dynamic filters. You can create a client-side interface for generating various reports from predefined views.
 
 __Register view__:
 
