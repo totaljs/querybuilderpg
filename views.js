@@ -244,8 +244,6 @@ View.prototype.exec = function(query, callback) {
 
 	var db = DB();
 
-	db.debug();
-
 	if (data.skip != null) {
 		db.query('SELECT COUNT(1)::int4 AS count' + sql).first().callback(function(err, response) {
 			var count = response.count;
