@@ -115,8 +115,10 @@ View.prototype.exec = function(query, callback) {
 			for (let m of data.group) {
 				let field = t.fields.findItem('id', m);
 				if (field) {
-					cache.push(field.id);
-					fields.push(field.column + alias(field));
+					if (field.group) {
+						cache.push(field.id);
+						fields.push(field.column + alias(field));
+					}
 				}
 			}
 		}
