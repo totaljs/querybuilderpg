@@ -280,46 +280,46 @@ function makesql(opt, exec) {
 	switch (exec) {
 		case 'find':
 		case 'read':
-			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			isread = true;
 			break;
 		case 'list':
-			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			query = 'SELECT ' + (opt.fields || '*') + ' FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			isread = true;
 			break;
 		case 'count':
 			opt.first = true;
-			query = 'SELECT COUNT(1)::int as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			query = 'SELECT COUNT(1)::int as count FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			isread = true;
 			break;
 		case 'insert':
 			returning = opt.returning ? opt.returning.join(',') : opt.primarykey ? opt.primarykey : '';
 			tmp = pg_insertupdate(opt, true);
-			query = 'INSERT INTO ' + opt.table + ' (' + tmp.fields.join(',') + ') VALUES(' + tmp.query.join(',') + ')' + (returning ? ' RETURNING ' + returning : '');
+			query = 'INSERT INTO ' + opt.table2 + ' (' + tmp.fields.join(',') + ') VALUES(' + tmp.query.join(',') + ')' + (returning ? ' RETURNING ' + returning : '');
 			params = tmp.params;
 			break;
 		case 'remove':
 			returning = opt.returning ? opt.returning.join(',') : opt.primarykey ? opt.primarykey : '';
-			query = 'DELETE FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
+			query = 'DELETE FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
 			break;
 		case 'update':
 			returning = opt.returning ? opt.returning.join(',') : '';
 			tmp = pg_insertupdate(opt);
 			if (returning)
-				query = 'UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
+				query = 'UPDATE ' + opt.table2 + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + (returning ? ' RETURNING ' + returning : '');
 			else
-				query = 'WITH rows AS (UPDATE ' + opt.table + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
+				query = 'WITH rows AS (UPDATE ' + opt.table2 + ' SET ' + tmp.query.join(',') + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' RETURNING 1) SELECT COUNT(1)::int count FROM rows';
 			params = tmp.params;
 			break;
 		case 'check':
-			query = 'SELECT 1 as count FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			query = 'SELECT 1 as count FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '');
 			isread = true;
 			break;
 		case 'drop':
-			query = 'DROP TABLE ' + opt.table;
+			query = 'DROP TABLE ' + opt.table2;
 			break;
 		case 'truncate':
-			query = 'TRUNCATE TABLE ' + opt.table + ' RESTART IDENTITY';
+			query = 'TRUNCATE TABLE ' + opt.table2 + ' RESTART IDENTITY';
 			break;
 		case 'command':
 			break;
@@ -332,10 +332,10 @@ function makesql(opt, exec) {
 				case 'count':
 					opt.first = true;
 					var val = opt.scalar.key === '*' ? 1 : opt.scalar.key;
-					query = 'SELECT ' + opt.scalar.type.toUpperCase() + (opt.scalar.type !== 'count' ? ('(' + val + ')') : '(1)') + '::numeric as value FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '');
+					query = 'SELECT ' + opt.scalar.type.toUpperCase() + (opt.scalar.type !== 'count' ? ('(' + val + ')') : '(1)') + '::numeric as value FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '');
 					break;
 				case 'group':
-					query = 'SELECT ' + opt.scalar.key + ', ' + (opt.scalar.key2 ? ('SUM(' + opt.scalar.key2 + ')::numeric') : 'COUNT(1)::int') + ' as value FROM ' + opt.table + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' GROUP BY ' + opt.scalar.key;
+					query = 'SELECT ' + opt.scalar.key + ', ' + (opt.scalar.key2 ? ('SUM(' + opt.scalar.key2 + ')::numeric') : 'COUNT(1)::int') + ' as value FROM ' + opt.table2 + (where.length ? (' WHERE ' + where.join(' ')) : '') + ' GROUP BY ' + opt.scalar.key;
 					break;
 			}
 			isread = true;
@@ -490,8 +490,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		if (filter.schema == null && defschema)
 			filter.schema = defschema;
 
-		if (filter.schema)
-			filter.table = filter.schema + '.' + filter.table;
+		filter.table2 = filter.schema ? (filter.schema + '.' + filter.table) : filter.table;
 
 		if (pooling) {
 			var pool = POOLS[name] || (POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling }));
