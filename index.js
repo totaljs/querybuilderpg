@@ -274,8 +274,11 @@ function makesql(opt, exec) {
 
 	pg_where(where, opt, opt.filter, 'AND');
 
+	if (opt.fields instanceof Array)
+		opt.fields = opt.fields.join(',');
+
 	if (opt.language != null && opt.fields)
-		opt.fields = replacelanguage(opt.fields.join(','), opt.language);
+		opt.fields = replacelanguage(opt.fields, opt.language);
 
 	switch (exec) {
 		case 'find':
