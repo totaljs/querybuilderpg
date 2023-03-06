@@ -476,7 +476,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 	var onerror = null;
 
 	if (errorhandling)
-		onerror = (err, cmd) => errorhandling(err + ' - ' + cmd.query.substring(0, 60));
+		onerror = (err, cmd) => errorhandling(err + ' - ' + cmd.query.substring(0, 100));
 
 	var index = connstring.indexOf('?');
 	var defschema = '';
