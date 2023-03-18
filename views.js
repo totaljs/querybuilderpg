@@ -75,7 +75,7 @@ View.prototype.export = function() {
 	obj.color = t.color;
 	obj.fields = [];
 	for (var f of t.fields)
-		obj.fields.push({ id: f.id, name: f.name, icon: f.icon, color: f.color, type: f.type });
+		obj.fields.push({ id: f.id, name: f.name, icon: f.icon, color: f.color, type: f.type, group: f.group });
 	return obj;
 };
 
