@@ -1,4 +1,4 @@
-const FILTER = 'fields:[*id,type:{min|max|sum,count}],group:[string],filter:[*id,*type,*value],sort:[*id,type:{asc|desc}],take:number,skip:number,page:number,limit:number'.toJSONSchema();
+const FILTER = 'fields:[*id,type:{min|max|sum,count}],group:[*id:string],filter:[*id,*type,*value],sort:[*id,type:{asc|desc}],take:number,skip:number,page:number,limit:number'.toJSONSchema();
 exports.views = [];
 
 function View(data) {
@@ -10,7 +10,7 @@ function View(data) {
 }
 
 function alias(m) {
-	return m.as ? (' AS ' + m.as) : '';
+	return m.column ? (' AS ' + m.column) : '';
 }
 
 function parse(type, value) {
@@ -88,7 +88,14 @@ View.prototype.remove = function() {
 	t.cache = null;
 };
 
-View.prototype.exec = function(query, callback) {
+View.prototype.exec = function(query, callback, debug) {
+
+	if (query.fields) {
+		for (var m of query.fields) {
+			if (!m.type)
+				delete m.type;
+		}
+	}
 
 	var filter = FILTER.transform(query);
 	var data = filter.response;
@@ -112,12 +119,10 @@ View.prototype.exec = function(query, callback) {
 
 		if (data.group) {
 			for (let m of data.group) {
-				let field = t.fields.findItem('id', m);
-				if (field) {
-					if (field.group) {
-						cache.push(field.id);
-						fields.push(field.column + alias(field));
-					}
+				let field = t.fields.findItem('id', m.id);
+				if (field && field.group) {
+					cache.push(field.id);
+					fields.push(field.column);
 				}
 			}
 		}
@@ -134,7 +139,7 @@ View.prototype.exec = function(query, callback) {
 					}
 				} else {
 					cache.push(field.id);
-					fields.push(field.column + alias(field));
+					fields.push(field.column);
 				}
 			}
 		}
@@ -145,13 +150,13 @@ View.prototype.exec = function(query, callback) {
 				let field = t.cache[m];
 				if (field) {
 					cache.push(field.id);
-					fields.push(field.column + alias(field));
+					fields.push(field.column);
 				}
 			}
 		} else {
 			for (let m of t.fields) {
 				cache.push(m.id);
-				fields.push(m.column + alias(m));
+				fields.push(m.column);
 			}
 		}
 	}
@@ -206,7 +211,7 @@ View.prototype.exec = function(query, callback) {
 
 	if (data.group) {
 		for (let m of data.group) {
-			let field = t.cache[m];
+			let field = t.cache[m.id];
 			group.push(field.column);
 		}
 	}
@@ -226,7 +231,7 @@ View.prototype.exec = function(query, callback) {
 		data.skip = (data.page - 1) * data.take;
 
 	var sqlbefore = 'SELECT ' + fields.join(',');
-	var sqlwith = 'WITH records AS (' + t.sql + ')';
+	var sqlwith = 'WITH records AS (' + t.sql + ') ';
 	var sql = ' FROM records';
 
 	if (where.length)
@@ -239,6 +244,8 @@ View.prototype.exec = function(query, callback) {
 		sql += ' HAVING ' + having.join(' AND ');
 
 	var db = DB();
+
+	debug && db.debug();
 
 	if (data.skip != null) {
 		db.query(sqlwith + 'SELECT COUNT(1)::int4 AS count' + sql).first().callback(function(err, response) {
