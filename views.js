@@ -90,13 +90,6 @@ View.prototype.remove = function() {
 
 View.prototype.exec = function(query, callback, debug) {
 
-	if (query.fields) {
-		for (var m of query.fields) {
-			if (!m.type)
-				delete m.type;
-		}
-	}
-
 	var filter = FILTER.transform(query);
 	var data = filter.response;
 
