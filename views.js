@@ -10,7 +10,7 @@ function View(data) {
 }
 
 function alias(m) {
-	return m.column ? (' AS ' + m.column) : '';
+	return m.column ? (' AS ' + m.id) : '';
 }
 
 function parse(type, value) {
@@ -115,7 +115,7 @@ View.prototype.exec = function(query, callback, debug) {
 				let field = t.fields.findItem('id', m.id);
 				if (field && field.group) {
 					cache.push(field.id);
-					fields.push(field.column);
+					fields.push(field.column + alias(field));
 				}
 			}
 		}
@@ -132,7 +132,7 @@ View.prototype.exec = function(query, callback, debug) {
 					}
 				} else {
 					cache.push(field.id);
-					fields.push(field.column);
+					fields.push(field.column + alias(field));
 				}
 			}
 		}
@@ -143,13 +143,13 @@ View.prototype.exec = function(query, callback, debug) {
 				let field = t.cache[m];
 				if (field) {
 					cache.push(field.id);
-					fields.push(field.column);
+					fields.push(field.column + alias(field));
 				}
 			}
 		} else {
 			for (let m of t.fields) {
 				cache.push(m.id);
-				fields.push(m.column);
+				fields.push(m.column + alias(m));
 			}
 		}
 	}
