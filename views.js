@@ -103,7 +103,6 @@ View.prototype.exec = function(query, callback) {
 	var fields = [];
 	var group = [];
 	var where = [];
-	var relations = [];
 	var sort = [];
 	var cache = [];
 	var having = [];
@@ -226,14 +225,9 @@ View.prototype.exec = function(query, callback) {
 	if (data.page)
 		data.skip = (data.page - 1) * data.take;
 
-	for (let m of t.relations)
-		relations.push(m.type + ' JOIN ' + m.id + ' ON ' + m.on);
-
 	var sqlbefore = 'SELECT ' + fields.join(',');
-	var sql = ' FROM ' + t.from;
-
-	if (relations.length)
-		sql += (relations.length ? (' ' + relations.join(' ')) : '');
+	var sqlwith = 'WITH records AS (' + t.sql + ')';
+	var sql = ' FROM records';
 
 	if (where.length)
 		sql += ' WHERE ' + where.join(' AND ');
@@ -247,7 +241,7 @@ View.prototype.exec = function(query, callback) {
 	var db = DB();
 
 	if (data.skip != null) {
-		db.query('SELECT COUNT(1)::int4 AS count' + sql).first().callback(function(err, response) {
+		db.query(sqlwith + 'SELECT COUNT(1)::int4 AS count' + sql).first().callback(function(err, response) {
 			var count = response.count;
 
 			if (sort.length)
@@ -255,7 +249,7 @@ View.prototype.exec = function(query, callback) {
 
 			sql += ' LIMIT ' + data.take + ' OFFSET ' + data.skip;
 
-			db.query(sqlbefore + sql).callback(function(err, response) {
+			db.query(sqlwith + sqlbefore + sql).callback(function(err, response) {
 				response = { items: response };
 				response.count = count;
 				response.limit = data.take;
@@ -272,7 +266,7 @@ View.prototype.exec = function(query, callback) {
 		if (data.take)
 			sql += ' LIMIT ' + data.take;
 
-		db.query(sqlbefore + sql).callback(callback);
+		db.query(sqlwith + sqlbefore + sql).callback(callback);
 	}
 };
 

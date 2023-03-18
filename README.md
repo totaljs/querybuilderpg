@@ -46,19 +46,15 @@ __Register view__:
 var view = PG_VIEWS.create({
 	id: 'investments',
 	name: 'Investments',
-	from: 'tbl_investment a',
+	sql: "SELECT a.value, TO_CHAR(a.dtcreated, 'yyyy')::int4 AS created, b.name AS username, b.email AS useremail, b.phone AS userphone, c.name AS projectname FROM tbl_investment a LEFT JOIN tbl_user b ON b.id=a.userid LEFT JOIN tbl_project c ON c.id=a.projectid LIMIT 10",
 	fields: [
-		{ id: 'x1', column: 'a.value', as: 'value', name: 'Amount', type: 'number', group: true },
-		{ id: 'x2', column: 'TO_CHAR(a.dtcreated, \'yyyy\')::int4', as: 'created', name: 'Created', type: 'number' },
-		{ id: 'x3', column: 'b.name', as: 'username', name: 'User --> name', type: 'string', group: true },
-		{ id: 'x4', column: 'b.email', as: 'useremail', name: 'User --> email', type: 'string', group: true },
-		{ id: 'x5', column: 'b.phone', as: 'userphone', name: 'User --> phone', type: 'string', group: true },
-		{ id: 'x6', column: 'c.name', as: 'projectname', name: 'Project --> name', type: 'string', group: true }
+		{ id: 'x1', column: 'value', name: 'Amount', type: 'number', group: true },
+		{ id: 'x2', column: 'created', name: 'Created', type: 'number' },
+		{ id: 'x3', column: 'username', name: 'User --> name', type: 'string', group: true },
+		{ id: 'x4', column: 'useremail', name: 'User --> email', type: 'string', group: true },
+		{ id: 'x5', column: 'userphone', name: 'User --> phone', type: 'string', group: true },
+		{ id: 'x6', column: 'projectname', name: 'Project --> name', type: 'string', group: true }
 	],
-	relations: [
-		{ id: 'tbl_user b', type: 'LEFT', on: 'b.id=a.userid' },
-		{ id: 'tbl_project c', type: 'LEFT', on: 'c.id=a.projectid' }
-	]
 });
 ```
 
