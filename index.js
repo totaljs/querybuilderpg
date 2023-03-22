@@ -514,5 +514,3 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		}
 	});
 };
-
-global.PG_VIEWS = require('./views');
