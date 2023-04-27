@@ -7,6 +7,9 @@ const REG_LANGUAGE = /[a-z0-9]+§/gi;
 const REG_WRITE = /(INSERT|UPDATE|DELETE|DROP)\s/i;
 const LOGGER = '-- PostgreSQL -->';
 const POOLS = {};
+const REG_COL_TEST = /"|\s|:/;
+
+var FieldsCache = {};
 
 function exec(client, filter, callback, done, errorhandling) {
 
@@ -111,7 +114,15 @@ function pg_where(where, opt, filter, operator) {
 	for (var item of filter) {
 
 		if (opt.language != null && item.name && item.name[item.name.length - 1] === '§')
-			item.name = item.name.substring(0, item.name.length - 1) + opt.language;
+			item.name = replacelanguage(item.name, opt.language);
+		else if (item.name && !item.$processed) {
+			var key = '$where' + item.name;
+			if (FieldsCache[key])
+				item.name = FieldsCache[key];
+			else
+				item.name = FieldsCache[key] = REG_COL_TEST.test(item.name) ? item.name : ('"' + item.name + '"');
+			item.$processed = 1;
+		}
 
 		switch (item.type) {
 			case 'or':
@@ -254,7 +265,7 @@ function pg_insertupdate(filter, insert) {
 function replacelanguage(fields, language, noas) {
 	return fields.replace(REG_LANGUAGE, function(val) {
 		val = val.substring(0, val.length - 1);
-		return val + (noas ? language : (language ? (language + ' AS ' + val) : ''));
+		return '"' + val + '' + (noas ? language : (language ? (language + '" AS "' + val + '"') : '"'));
 	});
 }
 
@@ -274,11 +285,24 @@ function makesql(opt, exec) {
 
 	pg_where(where, opt, opt.filter, 'AND');
 
-	if (opt.fields instanceof Array)
-		opt.fields = opt.fields.join(',');
+	if (opt.fields instanceof Array) {
 
-	if (opt.language != null && opt.fields)
-		opt.fields = replacelanguage(opt.fields, opt.language);
+		for (let i = 0; i < opt.fields.length; i++) {
+			let m = opt.fields[i];
+			if (m[m.length - 1] === '§') {
+				let key = '$lan' + (opt.language || '') + m;
+				if (FieldsCache[key])
+					opt.fields[i] = FieldsCache[key];
+				else
+					opt.fields[i] = FieldsCache[key] = replacelanguage(m, opt.language);
+			} else if (FieldsCache[m])
+				opt.fields[i] = FieldsCache[m];
+			else
+				opt.fields[i] = FieldsCache[m] = REG_COL_TEST.test(m) ? m : ('"' + m + '"');
+		}
+
+		opt.fields = opt.fields.join(',');
+	}
 
 	switch (exec) {
 		case 'find':
@@ -353,19 +377,32 @@ function makesql(opt, exec) {
 	if (exec === 'find' || exec === 'read' || exec === 'list' || exec === 'query' || exec === 'check') {
 
 		if (opt.sort) {
+			if (opt.sort instanceof Array) {
+				tmp = '';
+				for (let i = 0; i < opt.sort.length; i++) {
+					let item = opt.sort[i];
+					index = item.lastIndexOf('_');
+					let name = item.substring(0, index);
+					let key = '';
 
-			tmp = '';
-
-			for (var i = 0; i < opt.sort.length; i++) {
-				var item = opt.sort[i];
-				index = item.lastIndexOf('_');
-				tmp += (i ? ', ' : ' ') + item.substring(0, index) + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
+					if (opt.language && name[name.length - 1] === '§') {
+						key = '$sort' + opt.language + name;
+						if (FieldsCache[key])
+							name = FieldsCache[key];
+						else
+							name = FieldsCache[key] = replacelanguage(name, opt.language);
+					} else {
+						key = '$sort' + name;
+						if (FieldsCache[key])
+							name = FieldsCache[key];
+						else
+							name = FieldsCache[key] = REG_COL_TEST.test(name) ? name : ('"' + name + '"');
+					}
+					tmp += (i ? ', ' : ' ') + name + ' ' + (item.substring(index + 1) === 'desc' ? 'DESC' : 'ASC');
+				}
+				opt.sort = tmp;
 			}
-
-			if (opt.language != null)
-				tmp = replacelanguage(tmp, opt.language, true);
-
-			query += ' ORDER BY' + tmp;
+			query += ' ORDER BY' + opt.sort;
 		}
 
 		if (opt.take && opt.skip)
@@ -514,3 +551,8 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		}
 	});
 };
+
+ON('service', function(counter) {
+	if (counter % 10 === 0)
+		FieldsCache = {};
+});
