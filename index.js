@@ -7,7 +7,7 @@ const REG_LANGUAGE = /[a-z0-9]+§/gi;
 const REG_WRITE = /(INSERT|UPDATE|DELETE|DROP)\s/i;
 const LOGGER = '-- PostgreSQL -->';
 const POOLS = {};
-const REG_COL_TEST = /"|\s|:/;
+const REG_COL_TEST = /"|\s|:|\./;
 
 var FieldsCache = {};
 
