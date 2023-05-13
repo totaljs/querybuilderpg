@@ -1,6 +1,6 @@
 {
   "name": "querybuilderpg",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "PostgreSQL integrator",
   "main": "index.js",
   "scripts": {
