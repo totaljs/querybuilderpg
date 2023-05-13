@@ -207,9 +207,9 @@ function pg_where(where, opt, filter, operator) {
 					tmp = ['\'\''];
 
 				if (item.required)
-					where.push('(' + (item.useridfield ? (item.useridfield + '=' + pg_escape(item.userid) + ' OR ') : '') + 'array_length(' + name + ',1) IS NULL OR ' + name + '::_text && ARRAY[' + tmp.join(',') + '])');
+					where.push('(' + (item.userid ? ('userid=' + pg_escape(item.userid) + ' OR ') : '') + 'array_length(' + name + ',1) IS NULL OR ' + name + '::_text && ARRAY[' + tmp.join(',') + '])');
 				else
-					where.push('(' + (item.useridfield ? (item.useridfield + '=' + pg_escape(item.userid) + ' OR ') : '') + name + '::_text && ARRAY[' + tmp.join(',') + '])');
+					where.push('(' + (item.userid ? ('userid=' + pg_escape(item.userid) + ' OR ') : '') + name + '::_text && ARRAY[' + tmp.join(',') + '])');
 
 				break;
 
