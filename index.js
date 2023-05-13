@@ -194,6 +194,25 @@ function pg_where(where, opt, filter, operator) {
 				where.length && where.push(operator);
 				where.push('(' + name + ' BETWEEN ' + PG_ESCAPE(item.a) + ' AND ' + PG_ESCAPE(item.b) + ')');
 				break;
+			case 'permit':
+
+				where.length && where.push(operator);
+
+				tmp = [];
+
+				for (let m of item.value)
+					tmp.push(PG_ESCAPE(m));
+
+				if (!tmp.length)
+					tmp = ['\'\''];
+
+				if (item.required)
+					where.push('(' + (item.useridfield ? (item.useridfield + '=' + pg_escape(item.userid) + ' OR ') : '') + 'array_length(' + name + ',1) IS NULL OR ' + name + '::_text && ARRAY[' + tmp.join(',') + '])');
+				else
+					where.push('(' + (item.useridfield ? (item.useridfield + '=' + pg_escape(item.userid) + ' OR ') : '') + name + '::_text && ARRAY[' + tmp.join(',') + '])');
+
+				break;
+
 		}
 	}
 }
