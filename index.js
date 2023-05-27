@@ -393,7 +393,12 @@ function makesql(opt, exec) {
 			isread = true;
 			break;
 		case 'query':
-			query = opt.query + (where.length ? (' WHERE ' + where.join(' ')) : '');
+			if (where.length) {
+				let wherem = opt.query.match(/\{where\}/ig);
+				let wherec = 'WHERE ' + where.join(' ');
+				query = wherem ? opt.query.replace(wherem, wherec) : (opt.query + ' ' + wherec);
+			} else
+				query = opt.query;
 			params = opt.params;
 			isread = REG_WRITE.test(query) ? false : true;
 			break;
