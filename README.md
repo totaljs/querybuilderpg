@@ -23,8 +23,7 @@ require('querybuilderpg').init('default', CONF.database);
 __Usage__:
 
 ```js
-DB().find('tbl_user').where('id', 1234).callback(console.log);
-// DB('default').find('tbl_user').where('id', 1234).callback(console.log);
+DATA.find('tbl_user').where('id', 1234).callback(console.log);
 ```
 
 ## Connection string attributes
