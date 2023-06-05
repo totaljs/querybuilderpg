@@ -2,7 +2,7 @@
 
 A simple QueryBuilder integrator for PostgreSQL database.
 
-- [Documentation](https://docs.totaljs.com/total4/)
+- [Documentation](https://docs.totaljs.com/total4/pzbr001pr41d/)
 - `$ npm install querybuilderpg`
 
 ## Initialization
