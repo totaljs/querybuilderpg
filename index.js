@@ -241,7 +241,7 @@ function pg_insertupdate(filter, insert) {
 					fields.push('"' + key + '"');
 					query.push('$' + params.length);
 				} else
-					query.push('"' + key + '"=COALESCE(' + key + ',0)' + c + '$' + params.length);
+					query.push('"' + key + '"=COALESCE("' + key + '",0)' + c + '$' + params.length);
 				break;
 			case '>':
 			case '<':
