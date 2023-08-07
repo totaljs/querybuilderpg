@@ -153,6 +153,21 @@ function pg_where(where, opt, filter, operator) {
 					tmp.push('null');
 				where.push(name + (item.type === 'in' ? ' IN ' : ' NOT IN ') + '(' + tmp.join(',') + ')');
 				break;
+
+			case 'alike':
+				where.length && where.push(operator);
+				tmp = [];
+
+				if (item.value instanceof Array) {
+					for (let m of item.value)
+						tmp.push(PG_ESCAPE(m));
+				}
+
+				if (!tmp.length)
+					tmp = ['\'\''];
+
+				where.push(name + ' ' + item.comparer + ' ARRAY[' + tmp.join(',') + ']');
+				break;
 			case 'query':
 				where.length && where.push(operator);
 				where.push('(' + item.value + ')');
