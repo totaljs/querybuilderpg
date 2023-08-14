@@ -154,10 +154,11 @@ function pg_where(where, opt, filter, operator) {
 				where.push(name + (item.type === 'in' ? ' IN ' : ' NOT IN ') + '(' + tmp.join(',') + ')');
 				break;			
 			case 'array':
+
 				where.length && where.push(operator);
 				tmp = [];
 
-				if(typeof item.value === 'string')
+				if (typeof(item.value) === 'string')
 					item.value = item.value.split(',');
 
 				for (let m of item.value)
