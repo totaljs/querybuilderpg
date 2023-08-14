@@ -152,16 +152,16 @@ function pg_where(where, opt, filter, operator) {
 				if (!tmp.length)
 					tmp.push('null');
 				where.push(name + (item.type === 'in' ? ' IN ' : ' NOT IN ') + '(' + tmp.join(',') + ')');
-				break;
-
-			case 'alike':
+				break;			
+			case 'array':
 				where.length && where.push(operator);
 				tmp = [];
 
-				if (item.value instanceof Array) {
-					for (let m of item.value)
-						tmp.push(PG_ESCAPE(m));
-				}
+				if(typeof item.value === 'string')
+					item.value = item.value.split(',');
+
+				for (let m of item.value)
+					tmp.push(PG_ESCAPE(m));
 
 				if (!tmp.length)
 					tmp = ['\'\''];
@@ -191,7 +191,7 @@ function pg_where(where, opt, filter, operator) {
 				else if (item.operator === 'end')
 					where.push(name + ' ILIKE ' + PG_ESCAPE(tmp + '%'));
 				else
-					where.push(name + ' ILIKE ' + PG_ESCAPE('%' + tmp + '%'));
+					where.push(name + '::text ILIKE ' + PG_ESCAPE('%' + tmp + '%'));
 				break;
 			case 'month':
 			case 'year':
