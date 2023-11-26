@@ -464,6 +464,16 @@ function PG_ESCAPE(value) {
 	if (value == null)
 		return 'null';
 
+	if (value instanceof Array) {
+		var builder = [];
+		if (value.length) {
+			for (var m of value)
+				builder.push(PG_ESCAPE(m));
+			return 'ARRAY[' + builder.join(',') + ']';
+		} else
+			return 'null';
+	}
+
 	var type = typeof(value);
 
 	if (type === 'function') {
@@ -482,11 +492,11 @@ function PG_ESCAPE(value) {
 	if (type === 'string')
 		return pg_escape(value);
 
-	if (value instanceof Array)
-		return pg_escape(value.join(','));
-
 	if (value instanceof Date)
 		return pg_escape(dateToString(value));
+
+	if (type === 'object')
+		return pg_escape(JSON.stringify(value));
 
 	return pg_escape(value.toString());
 }
@@ -494,8 +504,10 @@ function PG_ESCAPE(value) {
 // Author: https://github.com/segmentio/pg-escape
 // License: MIT
 function pg_escape(val) {
+
 	if (val == null)
 		return 'NULL';
+
 	var backslash = ~val.indexOf('\\');
 	var prefix = backslash ? 'E' : '';
 	val = val.replace(REG_PG_ESCAPE_1, '\'\'').replace(REG_PG_ESCAPE_2, '\\\\');
