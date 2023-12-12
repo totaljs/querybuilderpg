@@ -267,7 +267,7 @@ function pg_insertupdate(filter, insert) {
 					fields.push('"' + key + '"');
 					query.push('$' + params.length);
 				} else
-					query.push('"' + key + '"=' + (c === '>' ? 'GREATEST' : 'LEAST') + '(' + key + ',$' + params.length + ')');
+					query.push('"' + key + '"=' + (c === '>' ? 'GREATEST' : 'LEAST') + '("' + key + '",$' + params.length + ')');
 				break;
 			case '!':
 				// toggle
