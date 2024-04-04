@@ -1,6 +1,6 @@
 {
   "name": "querybuilderpg",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "PostgreSQL integrator",
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,6 @@
     "url": "git+https://github.com/totaljs/querybuilderpg.git"
   },
   "dependencies": {
-    "total4": "latest",
     "pg": "latest"
   },
   "keywords": [
