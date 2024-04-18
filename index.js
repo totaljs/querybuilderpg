@@ -16,7 +16,14 @@ function exec(client, filter, callback, done, errorhandling) {
 	var cmd;
 
 	if (filter.exec === 'list') {
-		cmd = makesql(filter);
+
+		try {
+			cmd = makesql(filter);
+		} catch (e) {
+			done();
+			callback(e);
+			return;
+		}
 
 		if (filter.debug)
 			console.log(LOGGER, cmd.query, cmd.params);
@@ -42,7 +49,13 @@ function exec(client, filter, callback, done, errorhandling) {
 		return;
 	}
 
-	cmd = makesql(filter);
+	try {
+		cmd = makesql(filter);
+	} catch (e) {
+		done();
+		callback(e);
+		return;
+	}
 
 	if (filter.debug)
 		console.log(LOGGER, cmd.query, cmd.params);
@@ -186,7 +199,9 @@ function pg_where(where, opt, filter, operator) {
 				break;
 			case 'search':
 				where.length && where.push(operator);
-				tmp = item.value.replace(/%/g, '');
+
+				tmp = item.value ? item.value.replace(/%/g, '') : '';
+
 				if (item.operator === 'beg')
 					where.push(name + ' ILIKE ' + PG_ESCAPE('%' + tmp));
 				else if (item.operator === 'end')
