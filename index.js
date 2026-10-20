@@ -135,7 +135,9 @@ function pg_where(where, opt, filter, operator) {
 
 			if (!name) {
 				name = item.name;
-				if (name[name.length - 1] === '§')
+				if (name.substring(0, 5) === 'json:')
+					name = jsonname(name);
+				else if (name[name.length - 1] === '§')
 					name = replacelanguage(item.name, opt.language, true);
 				else
 					name = REG_COL_TEST.test(item.name) ? item.name : ('"' + item.name + '"');
@@ -319,6 +321,53 @@ function pg_insertupdate(filter, insert) {
 	return { fields, query, params };
 }
 
+// Neutral name from QueryBuilder.autoqueryjson(): "json:column:property:type"
+// Like in autoquery(), a value in a wrong format never fails: a missing property is NULL,
+// a mismatching value becomes the default one (Number: 0, Boolean: false, Date: NULL, Array: [])
+function jsonname(name, select) {
+
+	let arr = name.split(':');
+	let col = '"' + arr[1] + '"';
+	let key = '\'' + arr[2] + '\'';
+	let text = col + '->>' + key;
+	let expr;
+	let wrap;
+
+	switch (arr[3]) {
+		case 'number':
+		case 'decimal':
+		case 'float':
+			expr = 'CASE WHEN ' + text + ' IS NULL THEN NULL WHEN ' + text + ' ~ \'^\\s*-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\s*$\' THEN (' + text + ')::numeric ELSE 0 END';
+			wrap = 'to_jsonb';
+			break;
+		case 'boolean':
+		case 'bool':
+			expr = 'CASE WHEN ' + text + ' IS NULL THEN NULL WHEN lower(trim(' + text + ')) IN (\'true\',\'1\',\'on\',\'yes\') THEN true ELSE false END';
+			wrap = 'to_jsonb';
+			break;
+		case 'date':
+		case 'datetime':
+			// the regular expression validates the format and the days of month/leap year are validated here, a wrong date never fails
+			let y = 'substring(' + text + ',1,4)::int';
+			let m = 'substring(' + text + ',6,2)::int';
+			let d = 'substring(' + text + ',9,2)::int';
+			expr = 'CASE WHEN ' + text + ' ~ \'^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])([T ]([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9](\\.[0-9]+)?)?(Z|[+-](0[0-9]|1[0-5])(:?[0-5][0-9])?)?)?$\' AND ' + d + '<=CASE WHEN ' + m + '=2 THEN 28+(CASE WHEN (' + y + '%4=0 AND ' + y + '%100<>0) OR ' + y + '%400=0 THEN 1 ELSE 0 END) WHEN ' + m + ' IN (4,6,9,11) THEN 30 ELSE 31 END THEN (' + text + ')::timestamptz END';
+			break;
+		case '[string]':
+			let x = col + '::jsonb->' + key;
+			expr = 'CASE WHEN ' + x + ' IS NULL THEN NULL WHEN jsonb_typeof(' + x + ')=\'array\' THEN ARRAY(SELECT jsonb_array_elements_text(' + x + ')) ELSE ARRAY[]::text[] END';
+			break;
+		default:
+			expr = text;
+			break;
+	}
+
+	if (select)
+		return (wrap ? (wrap + '(' + expr + ')') : expr) + ' AS "' + arr[2] + '"';
+
+	return expr === text ? text : '(' + expr + ')';
+}
+
 function replacelanguage(fields, language, noas) {
 	return fields.replace(REG_LANGUAGE, function(val) {
 		val = val.substring(0, val.length - 1);
@@ -351,7 +400,9 @@ function makesql(opt, exec) {
 		if (!fields) {
 			for (let i = 0; i < opt.fields.length; i++) {
 				let m = opt.fields[i];
-				if (m[m.length - 1] === '§')
+				if (m.substring(0, 5) === 'json:')
+					fields += (fields ? ',' : '') + jsonname(m, true);
+				else if (m[m.length - 1] === '§')
 					fields += (fields ? ',' : '') + replacelanguage(m, opt.language);
 				else
 					fields += (fields ? ',' : '') + (REG_COL_TEST.test(m) ? m : ('"' + m + '"'));
@@ -445,7 +496,7 @@ function makesql(opt, exec) {
 					let m = opt.sort[i];
 					let index = m.lastIndexOf('_');
 					let name = m.substring(0, index);
-					let value = (REG_COL_TEST.test(name) ? name : ('"' + name + '"')).replace(/§/, language);
+					let value = name.substring(0, 5) === 'json:' ? jsonname(name) : (REG_COL_TEST.test(name) ? name : ('"' + name + '"')).replace(/§/, language);
 					sort += (sort ? ',' : '') + value + ' ' + (m.substring(index + 1).toLowerCase() === 'desc' ? 'DESC' : 'ASC');
 				}
 				FieldsCache[key] = sort;
