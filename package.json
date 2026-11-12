@@ -10,9 +10,6 @@
     "type": "git",
     "url": "git+https://github.com/totaljs/querybuilderpg.git"
   },
-  "dependencies": {
-    "pg": "latest"
-  },
   "keywords": [
     "orm",
     "postgresql",

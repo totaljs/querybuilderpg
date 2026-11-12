@@ -1,6 +1,6 @@
 // Total.js Module: PostgreSQL integrator
 const CANSTATS = global.F ? (global.F.stats && global.F.stats.performance && global.F.stats.performance.dbrm != null) : false;
-const Pg = require('pg');
+const Pg = require('./postgresql');
 const REG_PG_ESCAPE_1 = /'/g;
 const REG_PG_ESCAPE_2 = /\\/g;
 const REG_LANGUAGE = /[a-z0-9]+§/gi;
@@ -599,7 +599,6 @@ function dateToString(dt) {
 	return arr[0] + '-' + arr[1] + '-' + arr[2] + ' ' + arr[3] + ':' + arr[4] + ':' + arr[5];
 }
 
-Pg.types.setTypeParser(1700, val => val == null ? null : +val);
 global.PG_ESCAPE = PG_ESCAPE;
 
 exports.init = function(name, connstring, pooling, errorhandling) {
@@ -644,7 +643,7 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 		filter.table2 = filter.schema ? (filter.schema + '.' + filter.table) : filter.table;
 
 		if (pooling) {
-			var pool = POOLS[name] || (POOLS[name] = new Pg.Pool({ connectionString: connstring, max: pooling }));
+			var pool = POOLS[name] || (POOLS[name] = Pg.pool(connstring, pooling));
 			pool.connect(function(err, client, done) {
 				if (err)
 					callback(err);
@@ -652,12 +651,11 @@ exports.init = function(name, connstring, pooling, errorhandling) {
 					exec(client, filter, callback, done, onerror);
 			});
 		} else {
-			var client = new Pg.Client({ connectionString: connstring });
-			client.connect(function(err, client) {
+			Pg.connect(connstring, function(err, client) {
 				if (err)
 					callback(err);
 				else
-					exec(client, filter, callback, () => client.end(), onerror);
+					exec(client, filter, callback, () => client.close(), onerror);
 			});
 		}
 	});
