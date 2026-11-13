@@ -27,6 +27,15 @@ const Os = require('os');
 const SSLREQUEST = Buffer.from([0, 0, 0, 8, 4, 210, 22, 47]);
 const TERMINATE = Buffer.from([88, 0, 0, 0, 4]);
 const SYNC = Buffer.from([83, 0, 0, 0, 4]);
+
+// Describe (statement) + Flush
+const DESCRIBE = Buffer.from([68, 0, 0, 0, 6, 83, 0, 72, 0, 0, 0, 4]);
+
+// Describe (portal) + Execute + Sync
+const EXECUTE = Buffer.from([68, 0, 0, 0, 6, 80, 0, 69, 0, 0, 0, 9, 0, 0, 0, 0, 0, 83, 0, 0, 0, 4]);
+
+// Cache of parsed connection strings
+const OPTIONS = new Map();
 const REG_DATE = /^(\d+)-(\d\d)-(\d\d)(?:[ T](\d\d):(\d\d):(\d\d)(\.\d+)?)?(?:([+-])(\d\d)(?::?(\d\d))?(?::?(\d\d))?)?( BC)?$/;
 const REG_ARR_ESCAPE = /(\\|")/g;
 const ERROR_FIELDS = { S: 'severity', C: 'code', D: 'detail', H: 'hint', P: 'position', W: 'where', s: 'schema', t: 'table', c: 'column', d: 'datatype', n: 'constraint', R: 'routine' };
@@ -73,7 +82,65 @@ function parsebytea(val) {
 	return Buffer.from(arr);
 }
 
+function digits(val, index) {
+	return ((val.charCodeAt(index) - 48) * 10) + val.charCodeAt(index + 1) - 48;
+}
+
 function parsedate(val) {
+
+	var len = val.length;
+	var ms;
+
+	// A fast path for the most used formats:
+	// YYYY-MM-DD
+	// YYYY-MM-DD HH:MM:SS[.ffffff][+HH[:MM]]
+	if (len >= 10 && val.charCodeAt(4) === 45 && val.charCodeAt(7) === 45) {
+
+		var year = (digits(val, 0) * 100) + digits(val, 2);
+		var month = digits(val, 5) - 1;
+		var day = digits(val, 8);
+
+		if (year >= 100) {
+
+			if (len === 10)
+				return new Date(year, month, day);
+
+			if (len >= 19 && val.charCodeAt(10) === 32 && val.charCodeAt(13) === 58 && val.charCodeAt(16) === 58) {
+
+				var hh = digits(val, 11);
+				var mm = digits(val, 14);
+				var ss = digits(val, 17);
+				var pos = 19;
+				var mul = 100;
+				var c;
+
+				ms = 0;
+
+				if (pos < len && val.charCodeAt(pos) === 46) {
+					pos++;
+					while (pos < len) {
+						c = val.charCodeAt(pos) - 48;
+						if (c < 0 || c > 9)
+							break;
+						ms += c * mul;
+						mul = (mul / 10) | 0;
+						pos++;
+					}
+				}
+
+				// Without time zone --> local time
+				if (pos === len)
+					return new Date(year, month, day, hh, mm, ss, ms);
+
+				c = val.charCodeAt(pos);
+
+				if ((c === 43 || c === 45) && (len - pos === 3 || (len - pos === 6 && val.charCodeAt(pos + 3) === 58))) {
+					var tz = (digits(val, pos + 1) * 60) + (len - pos === 6 ? digits(val, pos + 4) : 0);
+					return new Date(Date.UTC(year, month, day, hh, mm, ss, ms) + ((c === 45 ? tz : -tz) * 60000));
+				}
+			}
+		}
+	}
 
 	if (val === 'infinity')
 		return Infinity;
@@ -86,8 +153,9 @@ function parsedate(val) {
 		return val;
 
 	var y = +m[1];
-	var ms = m[7] ? +(m[7] + '00').substring(1, 4) : 0;
 	var dt;
+
+	ms = m[7] ? +(m[7] + '00').substring(1, 4) : 0;
 
 	// 1 BC is the year 0
 	if (m[12])
@@ -321,6 +389,152 @@ function message(type, parts) {
 	return Buffer.concat(parts);
 }
 
+function readint32(buf, index) {
+	return (buf[index] << 24) | (buf[index + 1] << 16) | (buf[index + 2] << 8) | buf[index + 3];
+}
+
+// A shared buffer for building of query messages
+// Messages are written directly to this buffer, so a query needs only one allocation
+var WB = Buffer.allocUnsafe(16384);
+var WP = 0;
+
+function wreserve(size) {
+	if (WB.length - WP < size) {
+		var buf = Buffer.allocUnsafe(Math.max(WB.length * 2, WP + size));
+		WB.copy(buf, 0, 0, WP);
+		WB = buf;
+	}
+}
+
+function wint16(val) {
+	WB[WP++] = (val >> 8) & 255;
+	WB[WP++] = val & 255;
+}
+
+function wint32(val) {
+	WB[WP++] = (val >> 24) & 255;
+	WB[WP++] = (val >> 16) & 255;
+	WB[WP++] = (val >> 8) & 255;
+	WB[WP++] = val & 255;
+}
+
+// Writes a null-terminated string
+function wstring(val) {
+	var len = Buffer.byteLength(val, 'utf8');
+	wreserve(len + 1);
+	WB.write(val, WP, len, 'utf8');
+	WP += len;
+	WB[WP++] = 0;
+}
+
+// Begins a message and returns the position of its length
+function wbegin(type) {
+	wreserve(16);
+	WB[WP++] = type;
+	WP += 4;
+	return WP - 4;
+}
+
+function wend(pos) {
+	var len = WP - pos;
+	WB[pos] = (len >> 24) & 255;
+	WB[pos + 1] = (len >> 16) & 255;
+	WB[pos + 2] = (len >> 8) & 255;
+	WB[pos + 3] = len & 255;
+}
+
+function wraw(buf) {
+	wreserve(buf.length);
+	buf.copy(WB, WP);
+	WP += buf.length;
+}
+
+// Returns written data
+function wflush() {
+
+	var buf = Buffer.allocUnsafe(WP);
+	WB.copy(buf, 0, 0, WP);
+	WP = 0;
+
+	// Releases a big buffer
+	if (WB.length > 1048576)
+		WB = Buffer.allocUnsafe(16384);
+
+	return buf;
+}
+
+// Writes Parse message
+function wparse(sql) {
+	var pos = wbegin(80);
+	WB[WP++] = 0;
+	wstring(sql);
+	wreserve(2);
+	wint16(0);
+	wend(pos);
+}
+
+// Writes Bind + Describe + Execute + Sync messages
+// types {Number Array} optional, OID of parameters
+function wbind(params, types) {
+
+	var count = params.length;
+
+	wreserve(16 + (count * 2));
+
+	var pos = wbegin(66);
+	var len, val;
+
+	WB[WP++] = 0;
+	WB[WP++] = 0;
+	wint16(count);
+
+	// Formats are filled bellow
+	var fpos = WP + 1;
+	WP += count * 2;
+	wint16(count);
+
+	for (var i = 0; i < count; i++, fpos += 2) {
+
+		val = params[i];
+		WB[fpos - 1] = 0;
+		WB[fpos] = 0;
+
+		if (val == null) {
+			wreserve(4);
+			wint32(-1);
+			continue;
+		}
+
+		if (typeof(val) !== 'string') {
+
+			if (ArrayBuffer.isView(val)) {
+				// Binary data
+				len = val.byteLength;
+				wreserve(len + 4);
+				wint32(len);
+				WB.set(new Uint8Array(val.buffer, val.byteOffset, len), WP);
+				WP += len;
+				WB[fpos] = 1;
+				continue;
+			}
+
+			// JSON/JSONB: a JS array must be serialized as JSON, not as a PostgreSQL array
+			val = types && val instanceof Array && (types[i] === 114 || types[i] === 3802) ? JSON.stringify(val) : paramtostring(val);
+		}
+
+		len = Buffer.byteLength(val, 'utf8');
+		wreserve(len + 4);
+		wint32(len);
+		WB.write(val, WP, len, 'utf8');
+		WP += len;
+	}
+
+	wreserve(2);
+	wint16(0);
+	wend(pos);
+	wraw(EXECUTE);
+}
+
 function parseerror(buf, beg, end) {
 
 	var err = new Error('Unknown PostgreSQL error');
@@ -353,7 +567,16 @@ function parseoptions(opt) {
 	if (opt && opt.$parsed)
 		return opt;
 
-	var output = { $parsed: true, host: 'localhost', port: 5432, user: '', password: '', database: '', ssl: false, sslprefer: false, tls: null, timeout: 0, name: '' };
+	var output;
+
+	if (typeof(opt) === 'string') {
+		output = OPTIONS.get(opt);
+		if (output)
+			return output;
+	}
+
+	// "types" is a cache of types of parameters (SQL -> OID Array) and "scram" is a cache of SCRAM salted password
+	output = { $parsed: true, host: 'localhost', port: 5432, user: '', password: '', database: '', ssl: false, sslprefer: false, tls: null, timeout: 0, name: '', types: new Map(), scram: null };
 	var connstring = typeof(opt) === 'string' ? opt : opt ? (opt.connectionString || opt.connstring) : null;
 	var sslmode;
 
@@ -448,6 +671,11 @@ function parseoptions(opt) {
 	if (!output.database)
 		output.database = output.user;
 
+	if (typeof(opt) === 'string') {
+		OPTIONS.size > 100 && OPTIONS.clear();
+		OPTIONS.set(opt, output);
+	}
+
 	return output;
 }
 
@@ -459,7 +687,9 @@ function Client(opt) {
 	var t = this;
 	t.opt = parseoptions(opt);
 	t.socket = null;
-	t.buffer = null;
+	t.chunks = null;
+	t.chunksize = 0;
+	t.needed = 0;
 	t.queue = [];
 	t.current = null;
 	t.ready = false;
@@ -541,21 +771,54 @@ CP.startup = function() {
 CP.ondata = function(chunk) {
 
 	var t = this;
-	var buf = t.buffer ? Buffer.concat([t.buffer, chunk]) : chunk;
+
+	if (t.chunks) {
+
+		// Waits for the rest of the message, chunks are joined only once
+		t.chunks.push(chunk);
+		t.chunksize += chunk.length;
+
+		if (t.chunksize < t.needed)
+			return;
+
+		chunk = Buffer.concat(t.chunks, t.chunksize);
+		t.chunks = null;
+	}
+
+	var len = chunk.length;
 	var offset = 0;
+	var length, rest, beg;
 
 	try {
-		while (!t.closed && buf.length - offset >= 5) {
-			var length = buf.readInt32BE(offset + 1) + 1;
-			if (buf.length - offset < length)
+		while (!t.closed) {
+
+			rest = len - offset;
+
+			if (rest < 5)
 				break;
-			var beg = offset;
+
+			length = readint32(chunk, offset + 1) + 1;
+
+			if (length < 5) {
+				t.destroy(new Error('Invalid PostgreSQL message'));
+				break;
+			}
+
+			if (rest < length)
+				break;
+
+			beg = offset;
 			offset += length;
-			t.onmessage(buf[beg], buf, beg + 5, offset);
+			t.onmessage(chunk[beg], chunk, beg + 5, offset);
 		}
 	} finally {
 		// "finally" keeps the reader consistent if a query callback throws an exception
-		t.buffer = offset < buf.length ? buf.subarray(offset) : null;
+		if (offset < len && !t.closed) {
+			rest = len - offset;
+			t.chunks = [offset ? chunk.subarray(offset) : chunk];
+			t.chunksize = rest;
+			t.needed = rest < 5 ? 5 : (readint32(chunk, offset + 1) + 1);
+		}
 	}
 };
 
@@ -574,21 +837,47 @@ CP.onmessage = function(type, buf, beg, end) {
 
 			var fields = q.result.fields;
 			var row = {};
+			var field, length, val, stop;
 
-			count = buf.readInt16BE(beg);
+			count = (buf[beg] << 8) | buf[beg + 1];
 			beg += 2;
 
 			for (i = 0; i < count; i++) {
-				var length = buf.readInt32BE(beg);
-				var field = fields[i];
+
+				field = fields[i];
+				length = readint32(buf, beg);
 				beg += 4;
-				if (length === -1)
+
+				if (length === -1) {
 					row[field.name] = null;
-				else {
-					var val = buf.toString('utf8', beg, beg + length);
-					row[field.name] = field.parser ? field.parser(val) : val;
-					beg += length;
+					continue;
 				}
+
+				stop = beg + length;
+
+				switch (field.kind) {
+					case 1: // integer, it's parsed directly from bytes
+						val = 0;
+						index = buf[beg] === 45 ? (beg + 1) : beg;
+						for (; index < stop; index++)
+							val = (val * 10) + buf[index] - 48;
+						row[field.name] = buf[beg] === 45 ? -val : val;
+						break;
+					case 2: // boolean
+						row[field.name] = buf[beg] === 116;
+						break;
+					case 3: // ASCII values (numbers, dates)
+						row[field.name] = field.parser(buf.latin1Slice(beg, stop));
+						break;
+					case 4:
+						row[field.name] = field.parser(buf.utf8Slice(beg, stop));
+						break;
+					default:
+						row[field.name] = buf.utf8Slice(beg, stop);
+						break;
+				}
+
+				beg = stop;
 			}
 
 			q.result.rows.push(row);
@@ -607,7 +896,22 @@ CP.onmessage = function(type, buf, beg, end) {
 				index = buf.indexOf(0, beg);
 				var name = buf.toString('utf8', beg, index);
 				var oid = buf.readInt32BE(index + 7);
-				q.result.fields.push({ name: name, type: oid, parser: TYPES[oid] });
+				var parser = TYPES[oid];
+				var kind = 0;
+
+				// The kind determines how the value will be read, look into the "DataRow" message
+				if (parser) {
+					if (parser === parsenumber)
+						kind = oid === 21 || oid === 23 || oid === 26 ? 1 : 3;
+					else if (parser === parsebool)
+						kind = 2;
+					else if (parser === parsedate)
+						kind = 3;
+					else
+						kind = 4;
+				}
+
+				q.result.fields.push({ name: name, type: oid, parser: parser, kind: kind });
 				beg = index + 19;
 			}
 
@@ -672,8 +976,46 @@ CP.onmessage = function(type, buf, beg, end) {
 				// The server sends ReadyForQuery after the error
 				if (!q.error)
 					q.error = err;
+				// Cached types of parameters can be obsolete
+				if (q.cached) {
+					q.cached = false;
+					t.opt.types.delete(q.sql);
+				}
+				// The server waits for Sync
+				if (q.describing) {
+					q.describing = false;
+					t.socket.write(SYNC);
+				}
 			} else
 				t.destroy(err);
+
+			return;
+
+		case 116: // t: ParameterDescription
+
+			if (!q || !q.describing)
+				return;
+
+			q.describing = false;
+			count = buf.readInt16BE(beg);
+
+			var types = [];
+			for (i = 0; i < count; i++)
+				types.push(buf.readInt32BE(beg + 2 + (i * 4)));
+
+			// The next query with the same SQL won't need to ask for the types
+			t.opt.types.size > 2000 && t.opt.types.clear();
+			t.opt.types.set(q.sql, types);
+
+			try {
+				wbind(q.params, types);
+				t.socket.write(wflush());
+			} catch (e) {
+				// A parameter can't be serialized
+				WP = 0;
+				q.error = e;
+				t.socket.write(SYNC);
+			}
 
 			return;
 
@@ -699,7 +1041,7 @@ CP.onmessage = function(type, buf, beg, end) {
 	}
 
 	// Ignored messages:
-	// 1: ParseComplete, 2: BindComplete, 3: CloseComplete, n: NoData, s: PortalSuspended, t: ParameterDescription
+	// 1: ParseComplete, 2: BindComplete, 3: CloseComplete, n: NoData, s: PortalSuspended
 	// N: NoticeResponse, A: NotificationResponse, H: CopyOutResponse, d: CopyData, c: CopyDone
 };
 
@@ -765,15 +1107,7 @@ CP.onauth = function(code, buf, beg, end) {
 				return;
 			}
 
-			Crypto.pbkdf2(opt.password.normalize('NFKC'), Buffer.from(attr.s, 'base64'), iterations, 32, 'sha256', function(err, salted) {
-
-				if (t.closed)
-					return;
-
-				if (err) {
-					t.destroy(err);
-					return;
-				}
+			var finish = function(salted) {
 
 				var clientkey = Crypto.createHmac('sha256', salted).update('Client Key').digest();
 				var storedkey = Crypto.createHash('sha256').update(clientkey).digest();
@@ -787,6 +1121,26 @@ CP.onauth = function(code, buf, beg, end) {
 
 				scram.signature = Crypto.createHmac('sha256', serverkey).update(authmessage).digest('base64');
 				t.socket.write(message('p', [Buffer.from(final + ',p=' + signature.toString('base64'), 'utf8')]));
+			};
+
+			// PBKDF2 is expensive (thousands of iterations), so the salted password is cached for next connections
+			var cache = opt.scram;
+			if (cache && cache.salt === attr.s && cache.iterations === iterations) {
+				finish(cache.salted);
+				return;
+			}
+
+			Crypto.pbkdf2(opt.password.normalize('NFKC'), Buffer.from(attr.s, 'base64'), iterations, 32, 'sha256', function(err, salted) {
+
+				if (t.closed)
+					return;
+
+				if (err)
+					t.destroy(err);
+				else {
+					opt.scram = { salt: attr.s, iterations: iterations, salted: salted };
+					finish(salted);
+				}
 			});
 
 			return;
@@ -821,7 +1175,7 @@ CP.query = function(sql, params, callback) {
 	if (t.closed || t.ending)
 		process.nextTick(callback, new Error('Connection is closed'));
 	else {
-		t.queue.push({ sql: sql, params: params, callback: callback, results: [], result: null, error: null });
+		t.queue.push({ sql: sql, params: params, callback: callback, results: [], result: null, error: null, describing: false, cached: false });
 		t.next();
 	}
 };
@@ -846,58 +1200,57 @@ CP.next = function() {
 	var params = q.params;
 	var data;
 
-	if (params && params.length) {
+	try {
 
-		// Extended query protocol: Parse + Bind + Describe + Execute + Sync
-		try {
+		if (params && params.length) {
 
-			var formats = [int16(params.length)];
-			var values = [int16(params.length)];
+			// Extended query protocol: Parse + Bind + Describe + Execute + Sync
+			wparse(q.sql);
 
+			var types = null;
+
+			// A JS array can be a PostgreSQL array or JSON/JSONB value. It depends on the type of the parameter,
+			// so the client asks the server for the types of parameters first (Parse + Describe + Flush)
+			// and the query continues in the "ParameterDescription" message. The types are cached.
 			for (var i = 0; i < params.length; i++) {
-
-				var val = params[i];
-
-				if (val == null) {
-					formats.push(int16(0));
-					values.push(int32(-1));
-					continue;
+				if (params[i] instanceof Array) {
+					types = t.opt.types.get(q.sql);
+					if (types)
+						q.cached = true;
+					else
+						q.describing = true;
+					break;
 				}
-
-				if (ArrayBuffer.isView(val)) {
-					// Binary data
-					val = Buffer.from(val.buffer, val.byteOffset, val.byteLength);
-					formats.push(int16(1));
-				} else {
-					val = Buffer.from(paramtostring(val), 'utf8');
-					formats.push(int16(0));
-				}
-
-				values.push(int32(val.length), val);
 			}
 
-			var bind = [cstring(''), cstring('')].concat(formats, values, [int16(0)]);
+			if (q.describing)
+				wraw(DESCRIBE);
+			else
+				wbind(params, types);
 
-			data = Buffer.concat([
-				message('P', [cstring(''), cstring(q.sql), int16(0)]),
-				message('B', bind),
-				message('D', [Buffer.from('P'), cstring('')]),
-				message('E', [cstring(''), int32(0)]),
-				SYNC
-			]);
-
-		} catch (e) {
-			// A parameter can't be serialized
-			try {
-				q.callback(e);
-			} finally {
-				t.next();
-			}
-			return;
+		} else {
+			// Simple query protocol
+			var pos = wbegin(81);
+			wstring(q.sql);
+			wend(pos);
 		}
 
-	} else
-		data = message('Q', [cstring(q.sql)]);
+		data = wflush();
+
+	} catch (e) {
+
+		// A parameter can't be serialized
+		WP = 0;
+		q.describing = false;
+
+		try {
+			q.callback(e);
+		} finally {
+			t.next();
+		}
+
+		return;
+	}
 
 	t.current = q;
 	t.ready = false;
@@ -946,7 +1299,7 @@ CP.destroy = function(err) {
 
 	t.closed = true;
 	t.ready = false;
-	t.buffer = null;
+	t.chunks = null;
 
 	if (t.$timeout) {
 		clearTimeout(t.$timeout);
